@@ -3,7 +3,6 @@
 # start-local.sh — Start the SAGA with Liberty stack locally
 #
 # Prerequisites:
-#   - Java 17+, Maven 3.9+
 #   - Java 17+, Maven 3.9+, curl
 #   - Docker or Podman (for PostgreSQL only)
 #   - curl (for health checks)
@@ -103,7 +102,6 @@ for cmd in java mvn curl; do
 done
 
 # Detect container runtime (docker preferred, podman as fallback)
-# Always needed for PostgreSQL; also needed for LRA coordinator unless --no-container
 if command -v docker &>/dev/null; then
   CONTAINER_CLI=docker
 elif command -v podman &>/dev/null; then
