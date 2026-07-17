@@ -1,0 +1,136 @@
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# SAGA with Liberty – docker-compose
+#
+# Services:
+#   postgres          – shared PostgreSQL 16 database
+#   lra-coordinator   – Narayana LRA coordinator (required by mpLRA-2.0)
+#   deposit-service   – Open Liberty deposit microservice  (port 9081)
+#   withdrawal-service– Open Liberty withdrawal microservice (port 9082)
+#   transfer-service  – Open Liberty transfer orchestrator  (port 9083)
+#
+# Usage:
+#   docker-compose build
+#   docker-compose up
+#
+# The postgres JDBC driver must be copied into each Liberty server's
+# shared/resources/jdbc/ directory before build (see each service Dockerfile).
+# ---------------------------------------------------------------------------
+
+networks:
+  saga-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+
+services:
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL 16
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB:       sagadb
+      POSTGRES_USER:     saga
+      POSTGRES_PASSWORD: saga
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - saga-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saga -d sagadb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # Narayana LRA Coordinator
+  # Provides the LRA coordinator REST API on port 8070.
+  # -------------------------------------------------------------------------
+  lra-coordinator:
+    image: quay.io/jbosstm/lra-coordinator:latest
+    environment:
+      QUARKUS_HTTP_PORT: "8070"
+    ports:
+      - "8070:8070"
+    networks:
+      - saga-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8070/lra-coordinator || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # Deposit Service
+  # -------------------------------------------------------------------------
+  deposit-service:
+    build:
+      context: ./deposit-service
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST:           postgres
+      DB_PORT:           "5432"
+      DB_NAME:           sagadb
+      DB_USER:           saga
+      DB_PASSWORD:       saga
+      LRA_COORDINATOR_URL: http://lra-coordinator:8070/lra-coordinator
+    ports:
+      - "9081:9081"
+    networks:
+      - saga-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lra-coordinator:
+        condition: service_healthy
+
+  # -------------------------------------------------------------------------
+  # Withdrawal Service
+  # -------------------------------------------------------------------------
+  withdrawal-service:
+    build:
+      context: ./withdrawal-service
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST:           postgres
+      DB_PORT:           "5432"
+      DB_NAME:           sagadb
+      DB_USER:           saga
+      DB_PASSWORD:       saga
+      LRA_COORDINATOR_URL: http://lra-coordinator:8070/lra-coordinator
+    ports:
+      - "9082:9082"
+    networks:
+      - saga-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lra-coordinator:
+        condition: service_healthy
+
+  # -------------------------------------------------------------------------
+  # Transfer Service (SAGA orchestrator)
+  # -------------------------------------------------------------------------
+  transfer-service:
+    build:
+      context: ./transfer-service
+      dockerfile: Dockerfile
+    environment:
+      WITHDRAWAL_SERVICE_URL:  http://withdrawal-service:9082/withdrawal
+      DEPOSIT_SERVICE_URL:     http://deposit-service:9081/deposit
+      LRA_COORDINATOR_URL:     http://lra-coordinator:8070/lra-coordinator
+    ports:
+      - "9083:9083"
+    networks:
+      - saga-net
+    depends_on:
+      - deposit-service
+      - withdrawal-service
+      - lra-coordinator

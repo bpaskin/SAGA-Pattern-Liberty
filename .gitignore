@@ -1,0 +1,23 @@
+# Maven
+target/
+*.class
+
+# Liberty runtime (downloaded by liberty-maven-plugin)
+**/wlp/
+
+# Logs
+.logs/
+
+# LRA coordinator JAR cache
+.lra/
+
+# Narayana object store (created at runtime)
+ObjectStore/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store

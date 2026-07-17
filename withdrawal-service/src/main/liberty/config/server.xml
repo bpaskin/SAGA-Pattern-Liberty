@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Withdrawal Service">
+    <featureManager>
+        <feature>restfulWS-4.0</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.1</feature>
+        <feature>mpConfig-3.1</feature>
+        <feature>jdbc-4.3</feature>
+        <feature>jndi-1.0</feature>
+    </featureManager>
+
+    <variable name="db.host" defaultValue="localhost"/>
+    <variable name="db.port" defaultValue="5432"/>
+    <variable name="db.name" defaultValue="sagadb"/>
+    <variable name="db.user" defaultValue="saga"/>
+    <variable name="db.password" defaultValue="saga"/>
+
+    <dataSource id="AccountDS" jndiName="jdbc/AccountDS">
+        <jdbcDriver libraryRef="PostgreSQLLib"/>
+        <properties.postgresql
+            serverName="${db.host}"
+            portNumber="${db.port}"
+            databaseName="${db.name}"
+            user="${db.user}"
+            password="${db.password}"/>
+        <connectionManager maxPoolSize="10"/>
+    </dataSource>
+
+    <library id="PostgreSQLLib">
+        <fileset dir="${shared.resource.dir}/jdbc" includes="*.jar"/>
+    </library>
+
+    <httpEndpoint httpPort="9082" httpsPort="9445" host="*" id="defaultHttpEndpoint"/>
+
+    <webApplication location="withdrawal-service.war" contextRoot="/withdrawal"/>
+</server>
