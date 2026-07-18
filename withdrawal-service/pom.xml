@@ -29,23 +29,60 @@
             <type>pom</type>
             <scope>provided</scope>
         </dependency>
-        <!-- MicroProfile LRA annotations bundled in the WAR (no Liberty feature) -->
+        <!-- MicroProfile LRA API: compile-time annotations only; provided by Liberty at runtime -->
         <dependency>
             <groupId>org.eclipse.microprofile.lra</groupId>
             <artifactId>microprofile-lra-api</artifactId>
             <version>2.0.2</version>
+            <scope>provided</scope>
         </dependency>
         <!-- Narayana LRA client: JAX-RS filter that propagates LRA context headers
-             and communicates with the coordinator on behalf of the application -->
+             and communicates with the coordinator on behalf of the application.
+             Jakarta APIs are excluded (provided by jakarta.jakartaee-api).
+             Logging processor/annotations and jdeparser are compile-time tools,
+             not needed at runtime inside the WAR. -->
         <dependency>
             <groupId>org.jboss.narayana.rts</groupId>
             <artifactId>lra-client</artifactId>
             <version>7.1.0.Final</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.enterprise</groupId>
+                    <artifactId>jakarta.enterprise.cdi-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.ws.rs</groupId>
+                    <artifactId>jakarta.ws.rs-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-processor</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.jdeparser</groupId>
+                    <artifactId>jdeparser</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
+        <!-- PostgreSQL JDBC driver; checker-qual is a compile-time annotation library -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>42.7.13</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.checkerframework</groupId>
+                    <artifactId>checker-qual</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
