@@ -23,6 +23,90 @@ If either downstream call fails the **LRA coordinator** automatically invokes ev
 
 ---
 
+## Liberty User Feature — `client-lra-feature`
+
+The `client-lra-feature/` directory contains a standalone Liberty user feature project that packages the MicroProfile LRA 2.0 client-side JAX-RS filter as an installable OSGi bundle.
+
+### What it provides
+
+- Installs as **`usr:clientLRA-2.0`** in any Liberty `server.xml`
+- Adds a **`<lraCoordinator>`** config element for specifying the coordinator host and port directly in `server.xml`
+- Exposes `com.ibm.saga.clientlra.api` as a public API package on the application class path
+
+### Jakarta EE compatibility
+
+The feature's OSGi bundle imports Jakarta packages with version ranges that cover **both Jakarta EE 10 and Jakarta EE 11**. Either generation can be used in the same `server.xml`.
+
+| Liberty feature | Spec | Jakarta EE generation |
+|---|---|---|
+| `restfulWS-3.1` | JAX-RS 3.1 | EE 10 |
+| `restfulWS-4.0` | JAX-RS 4.0 | EE 11 |
+| `cdi-4.0` | CDI 4.0 | EE 10 |
+| `cdi-4.1` | CDI 4.1 | EE 11 |
+| `jsonb-3.0` | JSON-B 3.0 | EE 10 and EE 11 (unchanged) |
+| `jsonp-2.1` | JSON-P 2.1 | EE 10 and EE 11 (unchanged) |
+
+> **Minimum requirement:** Jakarta EE 10 (`restfulWS-3.1`, `cdi-4.0`). Jakarta EE 11 (`restfulWS-4.0`, `cdi-4.1`) is fully supported and is the default in `server-sample/server.xml`.
+
+### Build
+
+```bash
+cd client-lra-feature
+mvn clean package
+```
+
+Produces `feature/target/clientLRA-2.0-feature.zip` containing:
+```
+usr/extension/lib/com.ibm.saga.clientlra.jar
+usr/extension/lib/features/clientLRA-2.0.mf
+```
+
+### Install
+
+```bash
+# Install into a Liberty user directory
+./install-feature.sh /path/to/wlp/usr
+
+# Or unzip manually
+unzip feature/target/clientLRA-2.0-feature.zip -d /path/to/wlp/usr
+```
+
+### Configure in server.xml
+
+**Jakarta EE 11 (recommended):**
+```xml
+<featureManager>
+    <feature>restfulWS-4.0</feature>
+    <feature>cdi-4.1</feature>
+    <feature>jsonb-3.0</feature>
+    <feature>jsonp-2.1</feature>
+    <feature>mpConfig-3.1</feature>
+    <feature>usr:clientLRA-2.0</feature>
+</featureManager>
+
+<!-- Required: coordinator host and port -->
+<lraCoordinator host="lra-coordinator" port="8070"/>
+```
+
+**Jakarta EE 10:**
+```xml
+<featureManager>
+    <feature>restfulWS-3.1</feature>
+    <feature>cdi-4.0</feature>
+    <feature>jsonb-3.0</feature>
+    <feature>jsonp-2.1</feature>
+    <feature>mpConfig-3.1</feature>
+    <feature>usr:clientLRA-2.0</feature>
+</featureManager>
+
+<!-- Required: coordinator host and port -->
+<lraCoordinator host="lra-coordinator" port="8070"/>
+```
+
+The `path` attribute of `<lraCoordinator>` is optional and defaults to `/lra-coordinator`.
+
+---
+
 ## Quick Start — `start-local.sh`
 
 The easiest way to run everything locally. The script auto-detects `docker` or `podman` for PostgreSQL, runs the LRA coordinator as a local JVM process (no container required), builds all three services, and runs a smoke test.
@@ -249,7 +333,9 @@ sequenceDiagram
 
 ## Configuration
 
-All services read from `META-INF/microprofile-config.properties`. Any value can be overridden with the corresponding environment variable (uppercase, dots replaced with underscores).
+### deposit-service / withdrawal-service / transfer-service
+
+All three services read from `META-INF/microprofile-config.properties`. Any value can be overridden with the corresponding environment variable (uppercase, dots replaced with underscores).
 
 | Property | Default | Service |
 |----------|---------|---------|
@@ -261,6 +347,16 @@ All services read from `META-INF/microprofile-config.properties`. Any value can 
 | `db.name` | `sagadb` | deposit, withdrawal |
 | `db.user` | `saga` | deposit, withdrawal |
 | `db.password` | `saga` | deposit, withdrawal |
+
+### client-lra-feature
+
+The coordinator is configured exclusively via `server.xml` using the `<lraCoordinator>` element provided by the feature. There is no MicroProfile Config or environment-variable fallback.
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `host` | `localhost` | Hostname or IP of the LRA coordinator |
+| `port` | `8070` | HTTP port of the LRA coordinator |
+| `path` | `/lra-coordinator` | Context path of the coordinator REST API |
 
 ---
 

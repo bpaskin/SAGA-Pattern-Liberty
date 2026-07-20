@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    OSGi Metatype descriptor for the usr:clientLRA-2.0 Liberty feature.
+
+    Declaring this file inside the bundle at OSGI-INF/metatype/metatype.xml
+    causes Liberty to surface the <lraCoordinator> element in server.xml
+    with full tooling support (auto-complete, validation, hover docs).
+
+    Usage in server.xml:
+        <lraCoordinator host="lra-coordinator" port="8070"/>
+
+    Liberty maps the element name to the OCD id "lraCoordinator" and the
+    pid "com.ibm.saga.clientlra.coordinator", then delivers the config as a
+    Dictionary to the ManagedService registered under that pid.
+-->
+<metatype:MetaData xmlns:metatype="http://www.osgi.org/xmlns/metatype/v1.3.0"
+                   xmlns:ibm="http://www.ibm.com/xmlns/appserv/metatype/v1"
+                   xmlns:ibmui="http://www.ibm.com/xmlns/appserv/metatype/ui/v1">
+
+    <OCD id="lraCoordinator"
+         name="LRA Coordinator"
+         description="Connection details for the Narayana LRA coordinator used by the usr:clientLRA-2.0 feature.">
+
+        <AD id="host"
+            name="Host"
+            description="Hostname or IP address of the LRA coordinator."
+            type="String"
+            required="false"
+            default="localhost"/>
+
+        <AD id="port"
+            name="Port"
+            description="HTTP port of the LRA coordinator."
+            type="Integer"
+            required="false"
+            default="8070"
+            min="1"
+            max="65535"/>
+
+        <AD id="path"
+            name="Context path"
+            description="Context path of the LRA coordinator REST endpoint."
+            type="String"
+            required="false"
+            default="/lra-coordinator"/>
+
+    </OCD>
+
+    <!--
+        Designate ties the OCD to the ManagedService pid that the bundle
+        registers in BundleActivator.start().
+    -->
+    <Designate pid="com.ibm.saga.clientlra.coordinator">
+        <Object ocdref="lraCoordinator"/>
+    </Designate>
+
+</metatype:MetaData>

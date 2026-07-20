@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Sample server using usr:clientLRA-2.0">
+    <featureManager>
+        <!--
+            usr:clientLRA-2.0 is compatible with both Jakarta EE 10 and EE 11.
+            Choose ONE of the two sets of features below.
+
+            ── Jakarta EE 11 (Liberty 24.0.0.1+) ────────────────────────────
+              restfulWS-4.0   JAX-RS 4.0
+              cdi-4.1         CDI 4.1
+              jsonb-3.0       JSON-B 3.0   (same version for EE 10 and EE 11)
+              jsonp-2.1       JSON-P 2.1   (same version for EE 10 and EE 11)
+              mpConfig-3.1    MicroProfile Config 3.1
+
+            ── Jakarta EE 10 ─────────────────────────────────────────────────
+              restfulWS-3.1   JAX-RS 3.1
+              cdi-4.0         CDI 4.0
+              jsonb-3.0       JSON-B 3.0
+              jsonp-2.1       JSON-P 2.1
+              mpConfig-3.1    MicroProfile Config 3.1
+
+            Install the feature first:
+              unzip feature/target/clientLRA-2.0-feature.zip -d ${wlp.user.dir}
+        -->
+
+        <!-- Jakarta EE 11 features (default) -->
+        <feature>restfulWS-4.0</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.1</feature>
+        <feature>mpConfig-3.1</feature>
+
+        <!-- Jakarta EE 10 alternative — swap the two lines above for these:
+        <feature>restfulWS-3.1</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.0</feature>
+        <feature>mpConfig-3.1</feature>
+        -->
+
+        <feature>usr:clientLRA-2.0</feature>
+    </featureManager>
+
+    <!--
+        LRA coordinator location — required when usr:clientLRA-2.0 is active.
+        The bundle assembles lra.coordinator.url from these attributes at startup.
+        This is the only supported way to configure the coordinator; there is no
+        MicroProfile Config or environment-variable fallback.
+    -->
+    <lraCoordinator host="localhost" port="8070" path="/lra-coordinator"/>
+
+    <!--
+        HTTP/HTTPS listening port for this server.
+        Override at runtime with environment variables, e.g.:
+          WLP_HTTP_PORT=9084   (Liberty built-in variable)
+        Or change the defaultValue here for a different fixed port.
+    -->
+    <httpEndpoint httpPort="${lra.http.port}"
+                  httpsPort="${lra.https.port}"
+                  host="*"
+                  id="defaultHttpEndpoint"/>
+
+    <variable name="lra.http.port"  defaultValue="9084"/>
+    <variable name="lra.https.port" defaultValue="9447"/>
+
+</server>

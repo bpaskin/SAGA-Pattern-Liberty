@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ibm.saga</groupId>
+        <artifactId>client-lra-feature</artifactId>
+        <version>2.0.0</version>
+    </parent>
+
+    <artifactId>com.ibm.saga.clientlra.bundle</artifactId>
+    <packaging>jar</packaging>
+    <name>client-lra-feature :: OSGi Bundle</name>
+    <description>
+        OSGi bundle that implements the LRA 2.0 client-side JAX-RS filter
+        for the Liberty usr:clientLRA-2.0 user feature.
+    </description>
+
+    <dependencies>
+        <!--
+            MicroProfile LRA API: compile-time annotations; at runtime these
+            are provided by the Liberty kernel (mpLRA-2.0 / clientLRA-2.0).
+        -->
+        <dependency>
+            <groupId>org.eclipse.microprofile.lra</groupId>
+            <artifactId>microprofile-lra-api</artifactId>
+            <version>${mp.lra.api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+            Narayana LRA client: the JAX-RS ClientFilter that propagates the
+            Long-Running-Action header.  Provided at runtime by this bundle.
+            Jakarta APIs are excluded (Liberty provides them).
+        -->
+        <dependency>
+            <groupId>org.jboss.narayana.rts</groupId>
+            <artifactId>lra-client</artifactId>
+            <version>${narayana.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.enterprise</groupId>
+                    <artifactId>jakarta.enterprise.cdi-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.ws.rs</groupId>
+                    <artifactId>jakarta.ws.rs-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-processor</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.jdeparser</groupId>
+                    <artifactId>jdeparser</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!--
+            Jakarta RS API: compile against 3.1 (EE 10 minimum); the OSGi
+            Import-Package range below covers both 3.x (EE 10) and 4.x (EE 11).
+            Provided at runtime by Liberty's restfulWS-3.1 or restfulWS-4.0 feature.
+        -->
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>3.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- OSGi core API needed for BundleActivator; provided by Liberty runtime -->
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.core</artifactId>
+            <version>8.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+            OSGi Compendium: provides ManagedService (Config Admin) used by
+            LraCoordinatorConfig to receive <lraCoordinator> config from Liberty.
+            Provided at runtime by the Liberty kernel.
+        -->
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.service.cm</artifactId>
+            <version>1.6.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                maven-bundle-plugin writes a proper OSGi MANIFEST.MF into
+                META-INF/MANIFEST.MF using the <instructions> below.
+                The jar:jar goal later picks it up automatically.
+            -->
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>5.1.9</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <!-- Unique identifier for this OSGi bundle -->
+                        <Bundle-SymbolicName>com.ibm.saga.clientlra</Bundle-SymbolicName>
+                        <Bundle-Version>2.0.0</Bundle-Version>
+                        <Bundle-Name>IBM SAGA Client LRA Feature Bundle</Bundle-Name>
+                        <Bundle-Description>
+                            OSGi bundle for the Liberty usr:clientLRA-2.0 user feature.
+                            Registers the Narayana LRA JAX-RS client filter as an OSGi
+                            Declarative Service so Liberty auto-discovers it.
+                        </Bundle-Description>
+
+                        <!-- Lifecycle: BundleActivator registers the JAX-RS filter -->
+                        <Bundle-Activator>
+                            com.ibm.saga.clientlra.internal.LraClientActivator
+                        </Bundle-Activator>
+
+                        <!--
+                            Export the public API package so applications that
+                            depend on this feature can use it directly.
+                        -->
+                        <Export-Package>
+                            com.ibm.saga.clientlra.api;version="2.0.0"
+                        </Export-Package>
+
+                        <!--
+                            Internal packages must not be exported; use
+                            wildcard to keep all com.ibm.saga.clientlra.internal
+                            and the repackaged Narayana classes private.
+                        -->
+                        <Private-Package>
+                            com.ibm.saga.clientlra.internal.*,
+                            io.narayana.lra.*,
+                            org.jboss.narayana.rts.*
+                        </Private-Package>
+
+                        <!--
+                            Import-Package version ranges cover both Jakarta EE 10
+                            and Jakarta EE 11:
+                              jakarta.ws.rs      3.x (EE 10: restfulWS-3.1)
+                                                 4.x (EE 11: restfulWS-4.0)
+                              jakarta.annotation 2.x (EE 10: annotation-2.0)
+                                                 3.x (EE 11: annotation-3.0)
+                            Upper bound is exclusive, so [3.0,5) covers 3.x and 4.x.
+                        -->
+                        <Import-Package>
+                            jakarta.ws.rs.*;version="[3.0,5)",
+                            jakarta.annotation.*;version="[2.0,4)",
+                            org.eclipse.microprofile.lra.annotation.*;version="[2.0,3)",
+                            org.osgi.framework;version="[1.8,2)",
+                            org.osgi.service.cm;version="[1.6,2)",
+                            *
+                        </Import-Package>
+
+                        <!--
+                            Include the metatype XML so Liberty surfaces
+                            <lraCoordinator> in server.xml with tooling support.
+                        -->
+                        <Include-Resource>
+                            OSGI-INF/metatype/metatype.xml=src/main/resources/OSGI-INF/metatype/metatype.xml
+                        </Include-Resource>
+
+                        <!-- Embed the Narayana lra-client jar inside the bundle -->
+                        <Embed-Dependency>lra-client;inline=true</Embed-Dependency>
+                        <Embed-Transitive>false</Embed-Transitive>
+                    </instructions>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>bundle-manifest</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>manifest</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Tell maven-jar-plugin to use the OSGi manifest generated above -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifestFile>
+                            ${project.build.outputDirectory}/META-INF/MANIFEST.MF
+                        </manifestFile>
+                    </archive>
+                    <finalName>com.ibm.saga.clientlra</finalName>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
