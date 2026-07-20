@@ -6,14 +6,10 @@ IBM-Feature-Version: 2
 IBM-ShortName: clientLRA-2.0
 Subsystem-Name: LRA 2.0 Client Feature
 Subsystem-Description: Liberty user feature providing the MicroProfile LRA \
- 2.0 client-side JAX-RS filter. Requires Jakarta EE 10 features as a \
- baseline; tolerates Jakarta EE 11 equivalents when present.
-Subsystem-Content: com.ibm.saga.clientlra; version="[2.0,3)",\
- io.openliberty.restfulWS-3.1; type="osgi.subsystem.feature"; ibm.tolerates:="4.0",\
- io.openliberty.cdi-4.0; type="osgi.subsystem.feature"; ibm.tolerates:="4.1",\
- io.openliberty.jsonp-2.1; type="osgi.subsystem.feature",\
- io.openliberty.jsonb-3.0; type="osgi.subsystem.feature",\
- io.openliberty.mpConfig-3.1; type="osgi.subsystem.feature"
+ 2.0 client-side JAX-RS filter (Narayana lra-client). The bundle is \
+ self-contained — jboss-logging and microprofile-lra-api are embedded. \
+ The application's server.xml must still enable restfulWS-x.x and cdi-x.x.
+Subsystem-Content: com.ibm.saga.clientlra; version="[2.0,3)"
 IBM-API-Package: com.ibm.saga.clientlra.api; version="2.0.0"; type="api",\
  org.eclipse.microprofile.lra.annotation; version="2.0.2"; type="api",\
  org.eclipse.microprofile.lra.annotation.ws.rs; version="2.0.2"; type="api",\

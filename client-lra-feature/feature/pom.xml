@@ -87,6 +87,7 @@
                                     <version>${project.version}</version>
                                     <type>jar</type>
                                     <destFileName>com.ibm.saga.clientlra.jar</destFileName>
+                                    <classifier></classifier>
                                     <outputDirectory>
                                         ${project.build.directory}/wlp-extension/usr/extension/lib
                                     </outputDirectory>

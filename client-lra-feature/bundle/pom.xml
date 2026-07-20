@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>com.ibm.saga.clientlra.bundle</artifactId>
-    <packaging>jar</packaging>
+    <packaging>bundle</packaging>
     <name>client-lra-feature :: OSGi Bundle</name>
     <description>
         OSGi bundle that implements the LRA 2.0 client-side JAX-RS filter
@@ -21,14 +21,18 @@
 
     <dependencies>
         <!--
-            MicroProfile LRA API: compile-time annotations; at runtime these
-            are provided by the Liberty kernel (mpLRA-2.0 / clientLRA-2.0).
+            microprofile-lra-api: compiled AND embedded into the bundle so that
+            Liberty can wire the org.eclipse.microprofile.lra.annotation.* packages
+            to applications via IBM-API-Package.  Without this, Weld/CDI cannot load
+            LRAStatus or any other LRA annotation class when scanning application WARs.
+            Scope is compile (not provided) so maven-bundle-plugin includes it in
+            Embed-Dependency and the classes are present in the bundle JAR at runtime.
         -->
         <dependency>
             <groupId>org.eclipse.microprofile.lra</groupId>
             <artifactId>microprofile-lra-api</artifactId>
             <version>${mp.lra.api.version}</version>
-            <scope>provided</scope>
+            <scope>compile</scope>
         </dependency>
         <!--
             Narayana LRA client: the JAX-RS ClientFilter that propagates the
@@ -53,14 +57,17 @@
                     <artifactId>jakarta.ws.rs-api</artifactId>
                 </exclusion>
                 <exclusion>
+                    <!-- annotation processor only, not needed at runtime -->
                     <groupId>org.jboss.logging</groupId>
                     <artifactId>jboss-logging-processor</artifactId>
                 </exclusion>
                 <exclusion>
+                    <!-- annotation stubs only, not needed at runtime -->
                     <groupId>org.jboss.logging</groupId>
                     <artifactId>jboss-logging-annotations</artifactId>
                 </exclusion>
                 <exclusion>
+                    <!-- code generator only, not needed at runtime -->
                     <groupId>org.jboss.jdeparser</groupId>
                     <artifactId>jdeparser</artifactId>
                 </exclusion>
@@ -75,6 +82,13 @@
             <groupId>jakarta.ws.rs</groupId>
             <artifactId>jakarta.ws.rs-api</artifactId>
             <version>3.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- CDI API needed to compile @Vetoed package-info.java files; provided by Liberty at runtime -->
+        <dependency>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
+            <version>4.0.1</version>
             <scope>provided</scope>
         </dependency>
         <!-- OSGi core API needed for BundleActivator; provided by Liberty runtime -->
@@ -127,22 +141,30 @@
                         </Bundle-Activator>
 
                         <!--
-                            Export the public API package so applications that
-                            depend on this feature can use it directly.
+                            Export our own public API package AND all
+                            microprofile-lra-api packages so Liberty wires them
+                            to application classloaders via IBM-API-Package.
+                            Without exporting these, CDI/Weld cannot load
+                            LRAStatus or any LRA annotation class when scanning WAR.
                         -->
                         <Export-Package>
-                            com.ibm.saga.clientlra.api;version="2.0.0"
+                            com.ibm.saga.clientlra.api;version="2.0.0",
+                            org.eclipse.microprofile.lra.annotation;version="2.0.2",
+                            org.eclipse.microprofile.lra.annotation.ws.rs;version="2.0.2",
+                            org.eclipse.microprofile.lra.annotation.participate;version="2.0.2"
                         </Export-Package>
 
                         <!--
-                            Internal packages must not be exported; use
-                            wildcard to keep all com.ibm.saga.clientlra.internal
-                            and the repackaged Narayana classes private.
+                            Only our own internal package is listed as Private-Package.
+                            The Narayana lra-client and microprofile-lra-api packages
+                            are handled entirely by Embed-Dependency (inline=true) below,
+                            which expands their class files directly into the bundle JAR.
+                            The @Vetoed package-info.class files are injected via
+                            Include-Resource to prevent CDI/Weld from scanning
+                            NarayanaLRAClient during application deployment.
                         -->
                         <Private-Package>
-                            com.ibm.saga.clientlra.internal.*,
-                            io.narayana.lra.*,
-                            org.jboss.narayana.rts.*
+                            com.ibm.saga.clientlra.internal.*
                         </Private-Package>
 
                         <!--
@@ -152,53 +174,71 @@
                                                  4.x (EE 11: restfulWS-4.0)
                               jakarta.annotation 2.x (EE 10: annotation-2.0)
                                                  3.x (EE 11: annotation-3.0)
-                            Upper bound is exclusive, so [3.0,5) covers 3.x and 4.x.
+                            The LRA annotation packages are no longer imported —
+                            they are embedded and exported by this bundle itself.
+                        -->
+                        <!--
+                            io.narayana.lra.logging is generated by jboss-logging-processor
+                            at Narayana's build time but is NOT included in the published
+                            lra-client-7.1.0.Final.jar on Maven Central (upstream packaging
+                            bug). Marking it optional prevents the OSGi framework from
+                            failing to resolve the bundle when those classes are absent.
+                            At worst, logging calls inside NarayanaLRAClient silently
+                            produce no output — all exceptions still propagate normally.
                         -->
                         <Import-Package>
                             jakarta.ws.rs.*;version="[3.0,5)",
                             jakarta.annotation.*;version="[2.0,4)",
-                            org.eclipse.microprofile.lra.annotation.*;version="[2.0,3)",
                             org.osgi.framework;version="[1.8,2)",
                             org.osgi.service.cm;version="[1.6,2)",
+                            <!-- upstream packaging bug: not in lra-client-7.1.0.Final.jar -->
+                            io.narayana.lra.logging;resolution:=optional,
+                            <!-- jboss-logging backend adapters: only JUL is available in Liberty -->
+                            org.apache.log4j;resolution:=optional,
+                            org.apache.log4j.spi;resolution:=optional,
+                            org.apache.logging.log4j;resolution:=optional,
+                            org.apache.logging.log4j.message;resolution:=optional,
+                            org.apache.logging.log4j.spi;resolution:=optional,
+                            org.jboss.logmanager;resolution:=optional,
+                            org.jboss.logmanager.formatters;resolution:=optional,
+                            org.slf4j;resolution:=optional,
+                            org.slf4j.spi;resolution:=optional,
+                            org.slf4j.helpers;resolution:=optional,
+                            <!-- CDI pulled transitively by jboss-logging CDI bridge -->
+                            jakarta.enterprise.*;resolution:=optional,
                             *
                         </Import-Package>
 
                         <!--
-                            Include the metatype XML so Liberty surfaces
-                            <lraCoordinator> in server.xml with tooling support.
+                            Include-Resource brings in:
+                            1. The metatype XML for Liberty server.xml tooling support.
+                            2. The @Vetoed package-info.class files compiled from
+                               src/main/java/io/narayana/lra/. These tell CDI/Weld to
+                               skip all classes in those packages during app deployment,
+                               preventing the NoClassDefFoundError for LRAStatus that
+                               occurs when Weld scans NarayanaLRAClient.
                         -->
                         <Include-Resource>
-                            OSGI-INF/metatype/metatype.xml=src/main/resources/OSGI-INF/metatype/metatype.xml
+                            OSGI-INF/metatype/metatype.xml=src/main/resources/OSGI-INF/metatype/metatype.xml,
+                            io/narayana/lra/package-info.class=target/classes/io/narayana/lra/package-info.class,
+                            io/narayana/lra/client/package-info.class=target/classes/io/narayana/lra/client/package-info.class,
+                            io/narayana/lra/client/internal/package-info.class=target/classes/io/narayana/lra/client/internal/package-info.class
                         </Include-Resource>
 
-                        <!-- Embed the Narayana lra-client jar inside the bundle -->
-                        <Embed-Dependency>lra-client;inline=true</Embed-Dependency>
-                        <Embed-Transitive>false</Embed-Transitive>
+                        <!--
+                            Embed lra-client, microprofile-lra-api AND their runtime
+                            transitive dependencies (most importantly jboss-logging,
+                            which provides io.narayana.lra.logging) inline into the
+                            bundle JAR.  Without Embed-Transitive=true the OSGi
+                            framework cannot resolve the Import-Package for
+                            io.narayana.lra.logging and the bundle fails to start with
+                            "Unresolved requirement: Import-Package: io.narayana.lra.logging".
+                            Jakarta EE APIs (ws.rs, cdi, annotation) are excluded above
+                            so they are NOT pulled in transitively.
+                        -->
+                        <Embed-Dependency>lra-client;inline=true,microprofile-lra-api;inline=true,jboss-logging;inline=true</Embed-Dependency>
+                        <Embed-Transitive>true</Embed-Transitive>
                     </instructions>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>bundle-manifest</id>
-                        <phase>process-classes</phase>
-                        <goals>
-                            <goal>manifest</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Tell maven-jar-plugin to use the OSGi manifest generated above -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.4.2</version>
-                <configuration>
-                    <archive>
-                        <manifestFile>
-                            ${project.build.outputDirectory}/META-INF/MANIFEST.MF
-                        </manifestFile>
-                    </archive>
-                    <finalName>com.ibm.saga.clientlra</finalName>
                 </configuration>
             </plugin>
         </plugins>
