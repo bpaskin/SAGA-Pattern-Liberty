@@ -217,7 +217,21 @@
                         </Export-Package>
 
                         <Private-Package>
-                            com.ibm.saga.coordinatorlra.internal.*
+                            com.ibm.saga.coordinatorlra.internal.*,
+                            <!--
+                                All io.narayana.* packages are inlined via Embed-Dependency
+                                (lra-coordinator-jar, narayana-lra, lra-client, lra-proxy-api,
+                                lra-service-base).  Declaring them as Private-Package prevents
+                                bnd from generating mandatory Import-Package entries for them,
+                                which would cause CWWKE0702E on Liberty startup.
+                            -->
+                            io.narayana.lra.*,
+                            io.narayana.lra.coordinator.*,
+                            io.narayana.lra.client.*,
+                            io.narayana.lra.filter.*,
+                            io.narayana.lra.provider.*,
+                            io.narayana.lra.logging,
+                            io.narayana.proxy.logging
                         </Private-Package>
 
                         <Import-Package>
@@ -231,8 +245,16 @@
                             org.osgi.framework;version="[1.8,2)",
                             org.osgi.service.cm;version="[1.6,2)",
                             org.osgi.service.jdbc;resolution:=optional,
-                            <!-- upstream packaging: not always in released jars -->
-                            io.narayana.lra.logging;resolution:=optional,
+                            <!-- All io.narayana.* is inlined — never import from outside -->
+                            !io.narayana.*,
+                            <!--
+                                lra-proxy-api (inlined transitively) references org.jboss.jandex
+                                and org.jboss.modules at compile time, but those JARs are not
+                                present in Liberty.  Exclude them so the OSGi resolver does not
+                                generate a mandatory Import-Package entry for them.
+                            -->
+                            !org.jboss.jandex,
+                            !org.jboss.modules,
                             <!-- jboss-logging backend adapters; only JUL in Liberty -->
                             org.apache.log4j;resolution:=optional,
                             org.apache.log4j.spi;resolution:=optional,
