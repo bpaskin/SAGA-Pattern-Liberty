@@ -23,9 +23,10 @@ import java.util.logging.Logger;
  * <h2>DB store</h2>
  * <p>Uses Arjuna's {@code JDBCStore} backed by a Liberty-managed {@code <dataSource>}.
  * The JNDI name is taken from the {@code dataSourceRef} attribute of
- * {@code <lraCoordinatorStore>} and looked up at connection time by
- * {@link JndiDataSourceJDBCAccess}.  Liberty owns the connection pool, credentials,
- * and SSL — no raw JDBC URL or password is required in {@code server.xml}.
+ * {@code <lraCoordinatorStore>} and passed to Arjuna's built-in
+ * {@code DataSourceJDBCAccess}, which performs a JNDI lookup at connection time.
+ * Liberty owns the connection pool, credentials, and SSL — no raw JDBC URL or
+ * password is required in {@code server.xml}.
  */
 public class LraCoordinatorBootstrap {
 
@@ -39,6 +40,13 @@ public class LraCoordinatorBootstrap {
     /** Arjuna class name for the JDBC object store. */
     private static final String JDBC_STORE_CLASS =
             "com.arjuna.ats.internal.arjuna.objectstore.jdbc.JDBCStore";
+
+    /**
+     * Arjuna built-in accessor that performs a JNDI lookup for a {@link javax.sql.DataSource}.
+     * Parses {@code datasourceName=<jndiName>} from the semicolon-separated accessor string.
+     */
+    private static final String DATASOURCE_ACCESSOR_CLASS =
+            "com.arjuna.ats.internal.arjuna.objectstore.jdbc.accessors.DataSourceJDBCAccess";
 
     private final LraCoordinatorStoreConfig config;
     private volatile boolean running = false;
@@ -120,22 +128,22 @@ public class LraCoordinatorBootstrap {
      * Liberty-managed {@link javax.sql.DataSource} referenced by
      * {@code <lraCoordinatorStore dataSourceRef="…"/>}.
      *
-     * <p>The JNDI name is passed to {@link JndiDataSourceJDBCAccess} via Arjuna's
-     * accessor string format:
+     * <p>The JNDI name is passed to Arjuna's built-in {@code DataSourceJDBCAccess}
+     * via the semicolon-separated accessor string format:
      * <pre>
-     *   &lt;AccessorClass&gt;;jndiName=&lt;jndiName&gt;
+     *   &lt;AccessorClass&gt;;datasourceName=&lt;jndiName&gt;
      * </pre>
-     * Arjuna instantiates {@link JndiDataSourceJDBCAccess} reflectively, calls
-     * {@code initialise(Properties)}, and then delegates all {@code getConnection()}
-     * calls to it.
+     * Arjuna instantiates the accessor reflectively and calls
+     * {@code initialise(StringTokenizer)}, which reads the {@code datasourceName}
+     * token and stores it for use in {@code getConnection()}.
      */
     private void configureJdbcStore(ObjectStoreEnvironmentBean oseb) {
-        String jndiName   = config.getDataSourceRef();
-        String prefix     = config.getTablePrefix();
+        String jndiName = config.getDataSourceRef();
+        String prefix   = config.getTablePrefix();
 
-        // Arjuna accessor string: <class>;key=value pairs
-        String accessorString = JndiDataSourceJDBCAccess.class.getName()
-                + ";" + JndiDataSourceJDBCAccess.PROP_JNDI_NAME + "=" + jndiName;
+        // DataSourceJDBCAccess.initialise() tokenizes on ";" and splits each token on "="
+        // looking for a "datasourceName" key.
+        String accessorString = DATASOURCE_ACCESSOR_CLASS + ";datasourceName=" + jndiName;
 
         oseb.setObjectStoreType(JDBC_STORE_CLASS);
         oseb.setJdbcAccess(accessorString);

@@ -20,9 +20,10 @@ import java.util.logging.Logger;
  *
  *   <dt>{@code db}</dt>
  *   <dd>Narayana {@code JDBCStore} — transaction logs are stored in a relational database
- *       accessed through a Liberty {@code <dataSource>} element.  The {@code dataSourceRef}
- *       attribute must match the {@code jndiName} of a {@code <dataSource>} declared in the
- *       same {@code server.xml}.  Liberty manages the connection pool, credentials, and SSL.</dd>
+ *       accessed through Arjuna's built-in {@code DataSourceJDBCAccess}.  The
+ *       {@code dataSourceRef} attribute must match the {@code jndiName} of a
+ *       {@code <dataSource>} declared in the same {@code server.xml}.  Liberty manages the
+ *       connection pool, credentials, and SSL.</dd>
  * </dl>
  *
  * <p>Configuration changes in a running server are applied by restarting the coordinator
