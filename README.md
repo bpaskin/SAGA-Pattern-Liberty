@@ -18,8 +18,95 @@ If either downstream call fails the **LRA coordinator** automatically invokes ev
 | `deposit-service` | 9081 | `/deposit` | LRA participant — credits an account |
 | `withdrawal-service` | 9082 | `/withdrawal` | LRA participant — debits an account |
 | `transfer-service` | 9083 | `/transfer` | LRA orchestrator — starts the LRA and calls both participants |
-| Narayana LRA coordinator | 8070 | `/lra-coordinator` | Transaction coordinator |
+| Narayana LRA coordinator | 8070 | `/lra-coordinator` | Transaction coordinator (standalone process or `usr:coordinatorLRA-2.0`) |
 | PostgreSQL 16 | 5432 | — | Shared database |
+
+---
+
+## Liberty User Feature — `coordinator-lra-feature`
+
+The `coordinator-lra-feature/` directory contains a standalone Liberty user feature project that **embeds the Narayana LRA 2.0 coordinator REST API directly inside an Open Liberty server**, removing the need for a separate coordinator process.
+
+> **⚠ Dedicated server required.** The Liberty server running `usr:coordinatorLRA-2.0` must be used **exclusively** as a coordinator. Do not deploy application WARs, EARs, or add `<application>` elements to its `server.xml`, and do not place anything in its `dropins/` directory. Mixing business applications with the coordinator on the same server creates shared-classloader conflicts, risks port contention with participant callback endpoints, and makes it impossible to scale or restart the coordinator independently. Business microservices belong on their own Liberty servers and use `usr:clientLRA-2.0` to reach this coordinator.
+
+### What it provides
+
+- Installs as **`usr:coordinatorLRA-2.0`** in any Liberty `server.xml`
+- Serves the full LRA coordinator REST API at **`/lra-coordinator`** on the server's configured HTTP port
+- Adds a **`<lraCoordinatorStore>`** config element for selecting the transaction-log backend
+- Supports two storage backends, switchable without a rebuild:
+  - **`file`** (default) — Arjuna `ShadowNoFileLockStore`; logs written to `${server.output.dir}/lra-logs`
+  - **`db`** — Arjuna `JDBCStore` backed by the embedded PostgreSQL JDBC driver; logs stored in a relational database
+- Exposes `com.ibm.saga.coordinatorlra.api` and all MicroProfile LRA 2.0 annotation packages as public API on the application class path
+
+### Jakarta EE compatibility
+
+Same version ranges as `client-lra-feature` — compatible with **Jakarta EE 10 and EE 11**.
+
+### Build
+
+```bash
+cd coordinator-lra-feature
+mvn clean package
+```
+
+Produces `feature/target/coordinatorLRA-2.0-feature.zip` containing:
+```
+usr/extension/lib/com.ibm.saga.coordinatorlra.jar
+usr/extension/lib/features/coordinatorLRA-2.0.mf
+```
+
+### Install
+
+```bash
+# Install into a Liberty user directory
+./install-feature.sh /path/to/wlp/usr
+
+# Or unzip manually
+unzip feature/target/coordinatorLRA-2.0-feature.zip -d /path/to/wlp/usr
+```
+
+### Configure in server.xml
+
+**File store (default — no database required):**
+```xml
+<featureManager>
+    <feature>restfulWS-4.0</feature>
+    <feature>cdi-4.1</feature>
+    <feature>jsonb-3.0</feature>
+    <feature>jsonp-2.1</feature>
+    <feature>usr:coordinatorLRA-2.0</feature>
+</featureManager>
+
+<lraCoordinatorStore storeType="file"
+                     storeDir="${server.output.dir}/lra-logs"/>
+
+<httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="8070"/>
+```
+
+**Database store (PostgreSQL — durable across restarts):**
+```xml
+<featureManager>
+    <feature>restfulWS-4.0</feature>
+    <feature>cdi-4.1</feature>
+    <feature>jsonb-3.0</feature>
+    <feature>jsonp-2.1</feature>
+    <feature>usr:coordinatorLRA-2.0</feature>
+</featureManager>
+
+<lraCoordinatorStore storeType="db"
+                     dbUrl="jdbc:postgresql://localhost:5432/sagadb"
+                     dbUser="saga"
+                     dbPassword="secret"
+                     tablePrefix="lra_"/>
+
+<httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="8070"/>
+```
+
+Client services using `usr:clientLRA-2.0` point to this server with:
+```xml
+<lraCoordinator host="<coordinator-server-host>" port="8070"/>
+```
 
 ---
 
@@ -347,6 +434,19 @@ All three services read from `META-INF/microprofile-config.properties`. Any valu
 | `db.name` | `sagadb` | deposit, withdrawal |
 | `db.user` | `saga` | deposit, withdrawal |
 | `db.password` | `saga` | deposit, withdrawal |
+
+### coordinator-lra-feature
+
+The store backend is configured via `server.xml` using the `<lraCoordinatorStore>` element. Live changes to `server.xml` are applied without restarting the server.
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `storeType` | `file` | Storage backend: `file` or `db` |
+| `storeDir` | `${server.output.dir}/lra-logs` | Directory for file-based logs (`storeType="file"`) |
+| `dbUrl` | `jdbc:postgresql://localhost:5432/sagadb` | JDBC URL for the transaction-log database (`storeType="db"`) |
+| `dbUser` | `saga` | JDBC username (`storeType="db"`) |
+| `dbPassword` | _(empty)_ | JDBC password (`storeType="db"`) |
+| `tablePrefix` | `lra_` | Prefix for Arjuna object-store table names (`storeType="db"`) |
 
 ### client-lra-feature
 

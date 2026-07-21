@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    ╔══════════════════════════════════════════════════════════════════════╗
+    ║  DEDICATED COORDINATOR SERVER — DO NOT DEPLOY APPLICATIONS HERE     ║
+    ║                                                                      ║
+    ║  This server runs the LRA coordinator only.  No application WARs,   ║
+    ║  EARs, or other deployables should be placed in the dropins/ or      ║
+    ║  apps/ directories, and no <application> elements should be added    ║
+    ║  to this server.xml.                                                 ║
+    ║                                                                      ║
+    ║  Mixing business applications with the coordinator on the same       ║
+    ║  server creates shared-classloader conflicts, risks port contention  ║
+    ║  with participant callback endpoints, and makes it impossible to     ║
+    ║  scale or restart the coordinator independently.                     ║
+    ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<server description="LRA coordinator server — dedicated, no application deployments">
+    <featureManager>
+        <!--
+            usr:coordinatorLRA-2.0 embeds the Narayana LRA coordinator REST API
+            directly inside this Liberty server.  It is compatible with Jakarta EE 10
+            and EE 11.  Choose ONE set of features below.
+
+            This server is COORDINATOR-ONLY.  Do not add application features
+            (e.g. mpHealth, mpMetrics, servlet, jakartaee) or deploy any WARs/EARs.
+
+            ── Jakarta EE 11 (Liberty 24.0.0.1+) ────────────────────────────
+              restfulWS-4.0   JAX-RS 4.0
+              cdi-4.1         CDI 4.1
+              jsonb-3.0       JSON-B 3.0
+              jsonp-2.1       JSON-P 2.1
+
+            ── Jakarta EE 10 ─────────────────────────────────────────────────
+              restfulWS-3.1   JAX-RS 3.1
+              cdi-4.0         CDI 4.0
+              jsonb-3.0       JSON-B 3.0
+              jsonp-2.1       JSON-P 2.1
+
+            Install the feature first:
+              unzip feature/target/coordinatorLRA-2.0-feature.zip -d ${wlp.user.dir}
+        -->
+
+        <!-- Jakarta EE 11 features (default) -->
+        <feature>restfulWS-4.0</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.1</feature>
+
+        <!-- Jakarta EE 10 alternative — swap the three lines above for:
+        <feature>restfulWS-3.1</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.0</feature>
+        -->
+
+        <feature>usr:coordinatorLRA-2.0</feature>
+    </featureManager>
+
+    <!--
+        ── Option A: File-based transaction log store (default) ──────────────
+        Logs are written to ${server.output.dir}/lra-logs.
+        No database required.  Use this for development and single-node deployments.
+    -->
+    <lraCoordinatorStore storeType="file"
+                         storeDir="${server.output.dir}/lra-logs"/>
+
+    <!--
+        ── Option B: Database transaction log store ───────────────────────────
+        Replace the <lraCoordinatorStore> above with this block to persist logs
+        to PostgreSQL.  The PostgreSQL JDBC driver is embedded in the bundle.
+
+        <lraCoordinatorStore storeType="db"
+                             dbUrl="jdbc:postgresql://localhost:5432/sagadb"
+                             dbUser="saga"
+                             dbPassword="saga"
+                             tablePrefix="lra_"/>
+    -->
+
+    <!--
+        HTTP/HTTPS listening port for the coordinator.
+        Clients should set <lraCoordinator port="8070" .../> in their server.xml.
+        Override at runtime via the WLP_HTTP_PORT environment variable.
+    -->
+    <httpEndpoint httpPort="${lra.coordinator.http.port}"
+                  httpsPort="${lra.coordinator.https.port}"
+                  host="*"
+                  id="defaultHttpEndpoint"/>
+
+    <variable name="lra.coordinator.http.port"  defaultValue="8070"/>
+    <variable name="lra.coordinator.https.port" defaultValue="8470"/>
+
+    <!--
+        The coordinator REST API is served at: http://<host>:8070/lra-coordinator
+        Client services using usr:clientLRA-2.0 point to this server with:
+          <lraCoordinator host="<this-server-host>" port="8070"/>
+
+        ── Reminder ──────────────────────────────────────────────────────────
+        Keep this server dedicated to the coordinator.  Do not add <application>
+        elements, drop WARs into dropins/, or enable features beyond the minimal
+        set listed above.  Business logic belongs in separate Liberty servers.
+    -->
+
+</server>

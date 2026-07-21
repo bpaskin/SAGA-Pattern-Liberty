@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ibm.saga</groupId>
+        <artifactId>coordinator-lra-feature</artifactId>
+        <version>2.0.0</version>
+    </parent>
+
+    <artifactId>com.ibm.saga.coordinatorlra.bundle</artifactId>
+    <packaging>bundle</packaging>
+    <name>coordinator-lra-feature :: OSGi Bundle</name>
+    <description>
+        OSGi bundle that hosts the Narayana LRA 2.0 coordinator REST API inside
+        an Open Liberty server.  Transaction logs are written to a file store
+        (default) or a JDBC database, selected via the &lt;lraCoordinatorStore&gt;
+        server.xml element.
+    </description>
+
+    <dependencies>
+        <!--
+            lra-coordinator-jar: the Narayana LRA coordinator JAX-RS resource
+            classes.  Embedded inline so Liberty can serve them from this bundle.
+            Jakarta EE APIs (ws.rs, cdi, annotation) are excluded; Liberty provides them.
+        -->
+        <dependency>
+            <groupId>org.jboss.narayana.rts</groupId>
+            <artifactId>lra-coordinator-jar</artifactId>
+            <version>${narayana.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.enterprise</groupId>
+                    <artifactId>jakarta.enterprise.cdi-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.ws.rs</groupId>
+                    <artifactId>jakarta.ws.rs-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-processor</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.jdeparser</groupId>
+                    <artifactId>jdeparser</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!--
+            narayana-lra: CDI interceptors and participant management classes
+            referenced by lra-coordinator-jar at runtime.
+        -->
+        <dependency>
+            <groupId>org.jboss.narayana.rts</groupId>
+            <artifactId>narayana-lra</artifactId>
+            <version>${narayana.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.enterprise</groupId>
+                    <artifactId>jakarta.enterprise.cdi-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>jakarta.ws.rs</groupId>
+                    <artifactId>jakarta.ws.rs-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-processor</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.logging</groupId>
+                    <artifactId>jboss-logging-annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jboss.jdeparser</groupId>
+                    <artifactId>jdeparser</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!--
+            MicroProfile LRA API: embedded and exported so applications wired to
+            usr:coordinatorLRA-2.0 can use LRA annotations without a separate dep.
+        -->
+        <dependency>
+            <groupId>org.eclipse.microprofile.lra</groupId>
+            <artifactId>microprofile-lra-api</artifactId>
+            <version>${mp.lra.api.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!--
+            PostgreSQL JDBC driver: embedded for the optional DB store path.
+            Only activated when lraCoordinatorStore storeType="db" is configured.
+            Kept compile-scoped so it is included in Embed-Dependency below.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!--
+            arjunacore arjuna: the Arjuna object-store and transaction-manager
+            core.  Embedded inline so LraCoordinatorBootstrap can configure the
+            ObjectStoreEnvironmentBean at runtime.  Pulled transitively by
+            lra-coordinator-jar but listed explicitly here so maven-bundle-plugin
+            tracks it with Embed-Dependency.
+        -->
+        <dependency>
+            <groupId>org.jboss.narayana.arjunacore</groupId>
+            <artifactId>arjuna</artifactId>
+            <version>${narayana.version}</version>
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!--
+            Narayana common: provides BeanPopulator used by LraCoordinatorBootstrap.
+        -->
+        <dependency>
+            <groupId>org.jboss.narayana</groupId>
+            <artifactId>common</artifactId>
+            <version>${narayana.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Jakarta RS: compile against 3.1; provided at runtime by Liberty -->
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>3.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- CDI API: provided by Liberty at runtime -->
+        <dependency>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- OSGi core: BundleActivator; provided by Liberty kernel -->
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.core</artifactId>
+            <version>8.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            OSGi Compendium: ManagedService (Config Admin) used by
+            LraCoordinatorStoreConfig; provided by Liberty kernel.
+        -->
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.service.cm</artifactId>
+            <version>1.6.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>5.1.9</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Bundle-SymbolicName>com.ibm.saga.coordinatorlra</Bundle-SymbolicName>
+                        <Bundle-Version>2.0.0</Bundle-Version>
+                        <Bundle-Name>IBM SAGA Coordinator LRA Feature Bundle</Bundle-Name>
+                        <Bundle-Description>
+                            OSGi bundle for the Liberty usr:coordinatorLRA-2.0 user feature.
+                            Embeds the Narayana LRA coordinator JAX-RS resources and pluggable
+                            transaction-log store (file or JDBC database).
+                        </Bundle-Description>
+
+                        <Bundle-Activator>
+                            com.ibm.saga.coordinatorlra.internal.LraCoordinatorActivator
+                        </Bundle-Activator>
+
+                        <!--
+                            Export the MicroProfile LRA API packages so Liberty wires them
+                            to application classloaders via IBM-API-Package in the .mf.
+                        -->
+                        <Export-Package>
+                            com.ibm.saga.coordinatorlra.api;version="2.0.0",
+                            org.eclipse.microprofile.lra.annotation;version="2.0.2",
+                            org.eclipse.microprofile.lra.annotation.ws.rs;version="2.0.2",
+                            org.eclipse.microprofile.lra.annotation.participate;version="2.0.2"
+                        </Export-Package>
+
+                        <Private-Package>
+                            com.ibm.saga.coordinatorlra.internal.*
+                        </Private-Package>
+
+                        <Import-Package>
+                            jakarta.ws.rs.*;version="[3.0,5)",
+                            jakarta.annotation.*;version="[2.0,4)",
+                            jakarta.enterprise.*;resolution:=optional,
+                            jakarta.inject.*;resolution:=optional,
+                            jakarta.servlet.*;resolution:=optional,
+                            jakarta.transaction.*;resolution:=optional,
+                            javax.transaction.xa;resolution:=optional,
+                            org.osgi.framework;version="[1.8,2)",
+                            org.osgi.service.cm;version="[1.6,2)",
+                            org.osgi.service.jdbc;resolution:=optional,
+                            <!-- upstream packaging: not always in released jars -->
+                            io.narayana.lra.logging;resolution:=optional,
+                            <!-- jboss-logging backend adapters; only JUL in Liberty -->
+                            org.apache.log4j;resolution:=optional,
+                            org.apache.log4j.spi;resolution:=optional,
+                            org.apache.logging.log4j;resolution:=optional,
+                            org.apache.logging.log4j.message;resolution:=optional,
+                            org.apache.logging.log4j.spi;resolution:=optional,
+                            org.jboss.logmanager;resolution:=optional,
+                            org.jboss.logmanager.formatters;resolution:=optional,
+                            org.slf4j;resolution:=optional,
+                            org.slf4j.spi;resolution:=optional,
+                            org.slf4j.helpers;resolution:=optional,
+                            <!-- SmallRye / MicroProfile Fault Tolerance: not in Liberty -->
+                            io.smallrye.faulttolerance.*;resolution:=optional,
+                            org.eclipse.microprofile.faulttolerance.*;resolution:=optional,
+                            <!-- MicroProfile Config: optional, coordinator does not require it -->
+                            org.eclipse.microprofile.config;resolution:=optional,
+                            <!-- MicroProfile OpenAPI: optional annotation-only -->
+                            org.eclipse.microprofile.openapi.*;resolution:=optional,
+                            <!-- Arjuna JTA integration: not wired to Liberty's JTA engine -->
+                            com.arjuna.ats.internal.jta;resolution:=optional,
+                            <!-- Artemis journal store: optional native IO backend -->
+                            io.mashona.logwriting;resolution:=optional,
+                            org.apache.activemq.artemis.*;resolution:=optional,
+                            <!-- JNA: optional native library bridge -->
+                            com.sun.jna;resolution:=optional,
+                            com.sun.jna.*;resolution:=optional,
+                            waffle.windows.*;resolution:=optional,
+                            <!-- Android: not present on Liberty JVM -->
+                            android.os;resolution:=optional,
+                            <!-- Checker Framework: annotation-only at compile time -->
+                            org.checkerframework.*;resolution:=optional,
+                            <!-- JFree data: optional chart/report backend -->
+                            org.jfree.*;resolution:=optional,
+                            <!-- JConsole: optional management UI extension -->
+                            com.sun.tools.jconsole;resolution:=optional,
+                            *
+                        </Import-Package>
+
+                        <Include-Resource>
+                            OSGI-INF/metatype/metatype.xml=src/main/resources/OSGI-INF/metatype/metatype.xml
+                        </Include-Resource>
+
+                        <!--
+                            Embed lra-coordinator-jar, narayana-lra, microprofile-lra-api,
+                            jboss-logging, and the postgresql driver (for the DB store)
+                            inline into this bundle JAR.  Jakarta EE APIs are excluded.
+                        -->
+                        <Embed-Dependency>
+                            lra-coordinator-jar;inline=true,
+                            narayana-lra;inline=true,
+                            microprofile-lra-api;inline=true,
+                            jboss-logging;inline=true,
+                            postgresql;inline=true,
+                            arjuna;inline=true,
+                            common;inline=true
+                        </Embed-Dependency>
+                        <Embed-Transitive>true</Embed-Transitive>
+                    </instructions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

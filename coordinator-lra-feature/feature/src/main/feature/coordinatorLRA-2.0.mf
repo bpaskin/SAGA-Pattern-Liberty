@@ -1,0 +1,16 @@
+Subsystem-ManifestVersion: 1.0
+Subsystem-SymbolicName: com.ibm.saga.coordinatorlra-2.0; visibility:=public
+Subsystem-Version: 2.0.0
+Subsystem-Type: osgi.subsystem.feature
+IBM-Feature-Version: 2
+IBM-ShortName: coordinatorLRA-2.0
+Subsystem-Name: LRA 2.0 Coordinator Feature
+Subsystem-Description: Liberty user feature that embeds the Narayana LRA \
+ 2.0 coordinator REST API inside the Liberty server. Transaction logs are \
+ stored on the local file system (default) or in a relational database via \
+ JDBC. Configure the store via <lraCoordinatorStore> in server.xml.
+Subsystem-Content: com.ibm.saga.coordinatorlra; version="[2.0,3)"
+IBM-API-Package: com.ibm.saga.coordinatorlra.api; version="2.0.0"; type="api",\
+ org.eclipse.microprofile.lra.annotation; version="2.0.2"; type="api",\
+ org.eclipse.microprofile.lra.annotation.ws.rs; version="2.0.2"; type="api",\
+ org.eclipse.microprofile.lra.annotation.participate; version="2.0.2"; type="api"

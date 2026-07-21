@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ibm.saga</groupId>
+        <artifactId>coordinator-lra-feature</artifactId>
+        <version>2.0.0</version>
+    </parent>
+
+    <artifactId>com.ibm.saga.coordinatorlra.feature</artifactId>
+    <packaging>pom</packaging>
+    <name>coordinator-lra-feature :: Feature Assembly</name>
+    <description>
+        Assembles the OSGi bundle and feature manifest into the Liberty
+        usr:coordinatorLRA-2.0 installable layout under target/wlp-extension/.
+        Copy the output into your Liberty ${wlp.user.dir}/extension/ to install.
+    </description>
+
+    <dependencies>
+        <!-- Depend on the bundle module so it is built first -->
+        <dependency>
+            <groupId>com.ibm.saga</groupId>
+            <artifactId>com.ibm.saga.coordinatorlra.bundle</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                Copy the feature manifest into
+                target/wlp-extension/usr/extension/lib/features/
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-feature-manifest</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>
+                                ${project.build.directory}/wlp-extension/usr/extension/lib/features
+                            </outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/feature</directory>
+                                    <includes>
+                                        <include>*.mf</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+                Copy the OSGi bundle JAR into
+                target/wlp-extension/usr/extension/lib/
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-bundle-jar</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.ibm.saga</groupId>
+                                    <artifactId>com.ibm.saga.coordinatorlra.bundle</artifactId>
+                                    <version>${project.version}</version>
+                                    <type>jar</type>
+                                    <destFileName>com.ibm.saga.coordinatorlra.jar</destFileName>
+                                    <classifier></classifier>
+                                    <outputDirectory>
+                                        ${project.build.directory}/wlp-extension/usr/extension/lib
+                                    </outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+                Zip up the wlp-extension/ tree for single-archive distribution.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <executions>
+                    <execution>
+                        <id>zip-feature</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>coordinatorLRA-2.0-feature</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <descriptors>
+                                <descriptor>src/assembly/feature-zip.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
