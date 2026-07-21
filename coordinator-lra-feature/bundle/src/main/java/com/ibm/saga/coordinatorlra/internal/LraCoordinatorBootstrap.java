@@ -4,7 +4,6 @@ import com.arjuna.ats.arjuna.common.ObjectStoreEnvironmentBean;
 import com.arjuna.common.internal.util.propertyservice.BeanPopulator;
 
 import java.io.File;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -22,8 +21,11 @@ import java.util.logging.Logger;
  * to the value of the {@code server.output.dir} system property.
  *
  * <h2>DB store</h2>
- * <p>Uses Arjuna's {@code JDBCStore} backed by the embedded PostgreSQL driver.
- * The JDBC URL, user, and password come from {@code <lraCoordinatorStore>} attributes.
+ * <p>Uses Arjuna's {@code JDBCStore} backed by a Liberty-managed {@code <dataSource>}.
+ * The JNDI name is taken from the {@code dataSourceRef} attribute of
+ * {@code <lraCoordinatorStore>} and looked up at connection time by
+ * {@link JndiDataSourceJDBCAccess}.  Liberty owns the connection pool, credentials,
+ * and SSL — no raw JDBC URL or password is required in {@code server.xml}.
  */
 public class LraCoordinatorBootstrap {
 
@@ -37,15 +39,6 @@ public class LraCoordinatorBootstrap {
     /** Arjuna class name for the JDBC object store. */
     private static final String JDBC_STORE_CLASS =
             "com.arjuna.ats.internal.arjuna.objectstore.jdbc.JDBCStore";
-
-    /** Arjuna JDBC accessor class (simple pooled dynamic datasource). */
-    private static final String JDBC_ACCESSOR_CLASS =
-            "com.arjuna.ats.internal.arjuna.objectstore.jdbc.accessors"
-            + ".SimplePooledDynamicDataSourceJDBCAccess";
-
-    /** JDBC driver class name — PostgreSQL embedded in this bundle. */
-    private static final String PG_DRIVER_CLASS =
-            "org.postgresql.ds.PGSimpleDataSource";
 
     private final LraCoordinatorStoreConfig config;
     private volatile boolean running = false;
@@ -122,68 +115,35 @@ public class LraCoordinatorBootstrap {
         LOG.info("usr:coordinatorLRA-2.0 — file store configured at: " + resolvedDir);
     }
 
+    /**
+     * Configures Arjuna's {@code JDBCStore} to obtain connections from the
+     * Liberty-managed {@link javax.sql.DataSource} referenced by
+     * {@code <lraCoordinatorStore dataSourceRef="…"/>}.
+     *
+     * <p>The JNDI name is passed to {@link JndiDataSourceJDBCAccess} via Arjuna's
+     * accessor string format:
+     * <pre>
+     *   &lt;AccessorClass&gt;;jndiName=&lt;jndiName&gt;
+     * </pre>
+     * Arjuna instantiates {@link JndiDataSourceJDBCAccess} reflectively, calls
+     * {@code initialise(Properties)}, and then delegates all {@code getConnection()}
+     * calls to it.
+     */
     private void configureJdbcStore(ObjectStoreEnvironmentBean oseb) {
-        String url      = config.getDbUrl();
-        String user     = config.getDbUser();
-        String password = config.getDbPassword();
-        String prefix   = config.getTablePrefix();
+        String jndiName   = config.getDataSourceRef();
+        String prefix     = config.getTablePrefix();
 
-        /*
-         * Arjuna JDBC accessor connection string format:
-         *   <AccessorClass>;ClassName=<DataSourceClass>;ServerName=<host>;PortNumber=<port>;
-         *   DatabaseName=<db>;User=<user>;Password=<pwd>
-         *
-         * We derive host, port, and dbName from the JDBC URL so the admin only needs to
-         * provide a single familiar jdbc:postgresql://host:port/db URL string.
-         */
-        String accessorString = buildAccessorString(url, user, password);
+        // Arjuna accessor string: <class>;key=value pairs
+        String accessorString = JndiDataSourceJDBCAccess.class.getName()
+                + ";" + JndiDataSourceJDBCAccess.PROP_JNDI_NAME + "=" + jndiName;
 
         oseb.setObjectStoreType(JDBC_STORE_CLASS);
         oseb.setJdbcAccess(accessorString);
         oseb.setTablePrefix(prefix);
         oseb.setCreateTable(true);
-        LOG.info("usr:coordinatorLRA-2.0 — JDBC store configured (url=" + url
-                + ", tablePrefix=" + prefix + ")");
-    }
 
-    /**
-     * Builds the Arjuna JDBC accessor connection string from a standard JDBC URL.
-     *
-     * <p>Parses {@code jdbc:postgresql://host:port/database} and maps the parts to
-     * the {@code SimplePooledDynamicDataSourceJDBCAccess} key=value format.
-     */
-    static String buildAccessorString(String jdbcUrl, String user, String password) {
-        // Expected format: jdbc:postgresql://host:port/dbname[?params]
-        String host     = "localhost";
-        int    port     = 5432;
-        String database = "sagadb";
-
-        try {
-            // Strip jdbc: prefix then parse as URI
-            String rest = jdbcUrl;
-            if (rest.startsWith("jdbc:")) {
-                rest = rest.substring("jdbc:".length());
-            }
-            java.net.URI uri = new java.net.URI(rest);
-            if (uri.getHost() != null) host = uri.getHost();
-            if (uri.getPort() > 0)     port = uri.getPort();
-            String path = uri.getPath();
-            if (path != null && path.startsWith("/") && path.length() > 1) {
-                // strip leading / and any query path
-                database = path.substring(1).split("[/?]")[0];
-            }
-        } catch (Exception e) {
-            LOG.log(Level.WARNING, "usr:coordinatorLRA-2.0 — could not parse dbUrl '"
-                    + jdbcUrl + "', using defaults", e);
-        }
-
-        return JDBC_ACCESSOR_CLASS
-                + ";ClassName=" + PG_DRIVER_CLASS
-                + ";ServerName=" + host
-                + ";PortNumber=" + port
-                + ";DatabaseName=" + database
-                + ";User=" + user
-                + ";Password=" + password;
+        LOG.info("usr:coordinatorLRA-2.0 — JDBC store configured (dataSourceRef="
+                + jndiName + ", tablePrefix=" + prefix + ")");
     }
 
     /**

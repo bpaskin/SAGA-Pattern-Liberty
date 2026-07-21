@@ -49,7 +49,7 @@ The `coordinator-lra-feature/` directory contains a standalone Liberty user feat
 - Adds a **`<lraCoordinatorStore>`** config element for selecting the transaction-log backend
 - Supports two storage backends, switchable without a rebuild:
   - **`file`** (default) — Arjuna `ShadowNoFileLockStore`; logs written to `${server.output.dir}/lra-logs`
-  - **`db`** — Arjuna `JDBCStore` backed by the embedded PostgreSQL JDBC driver; logs stored in a relational database
+  - **`db`** — Arjuna `JDBCStore` connected through a Liberty-managed **`<dataSource>`**; credentials and connection pooling owned by Liberty — no raw JDBC URL or password inside `<lraCoordinatorStore>`
 - Exposes `com.ibm.saga.coordinatorlra.api` and all MicroProfile LRA 2.0 annotation packages as public API on the application class path
 
 ### Jakarta EE compatibility
@@ -97,7 +97,10 @@ unzip feature/target/coordinatorLRA-2.0-feature.zip -d /path/to/wlp/usr
 <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="8070"/>
 ```
 
-**Database store (PostgreSQL — durable across restarts):**
+**Database store (Liberty `<dataSource>` — durable across restarts):**
+
+The `db` store uses a Liberty-managed `<dataSource>` element. Liberty owns the connection pool, credentials, and driver loading. The `dataSourceRef` attribute is the `jndiName` of that `<dataSource>`. The `jdbc-4.3` and `jndi-1.0` features are required.
+
 ```xml
 <featureManager>
     <feature>restfulWS-4.0</feature>
@@ -105,12 +108,27 @@ unzip feature/target/coordinatorLRA-2.0-feature.zip -d /path/to/wlp/usr
     <feature>jsonb-3.0</feature>
     <feature>jsonp-2.1</feature>
     <feature>usr:coordinatorLRA-2.0</feature>
+    <feature>jdbc-4.3</feature>
+    <feature>jndi-1.0</feature>
 </featureManager>
 
+<dataSource id="LraCoordinatorDS" jndiName="jdbc/LraCoordinatorDS">
+    <jdbcDriver libraryRef="PostgreSQLLib"/>
+    <properties.postgresql
+        serverName="db-host"
+        portNumber="5432"
+        databaseName="sagadb"
+        user="saga"
+        password="secret"/>
+    <connectionManager maxPoolSize="5"/>
+</dataSource>
+
+<library id="PostgreSQLLib">
+    <fileset dir="${shared.resource.dir}/jdbc" includes="*.jar"/>
+</library>
+
 <lraCoordinatorStore storeType="db"
-                     dbUrl="jdbc:postgresql://localhost:5432/sagadb"
-                     dbUser="saga"
-                     dbPassword="secret"
+                     dataSourceRef="jdbc/LraCoordinatorDS"
                      tablePrefix="lra_"/>
 
 <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="8070"/>
@@ -531,14 +549,14 @@ All other properties (`withdrawal.service.url`, `deposit.service.url`, database 
 
 The store backend is configured via `server.xml` using the `<lraCoordinatorStore>` element. Live changes to `server.xml` are applied without restarting the server.
 
-| Attribute | Default | Description |
-|-----------|---------|-------------|
-| `storeType` | `file` | Storage backend: `file` or `db` |
-| `storeDir` | `${server.output.dir}/lra-logs` | Directory for file-based logs (`storeType="file"`) |
-| `dbUrl` | `jdbc:postgresql://localhost:5432/sagadb` | JDBC URL for the transaction-log database (`storeType="db"`) |
-| `dbUser` | `saga` | JDBC username (`storeType="db"`) |
-| `dbPassword` | _(empty)_ | JDBC password (`storeType="db"`) |
-| `tablePrefix` | `lra_` | Prefix for Arjuna object-store table names (`storeType="db"`) |
+| Attribute | Applies to | Default | Description |
+|-----------|------------|---------|-------------|
+| `storeType` | both | `file` | Storage backend: `file` or `db` |
+| `storeDir` | `file` | `${server.output.dir}/lra-logs` | Directory for file-based transaction logs |
+| `dataSourceRef` | `db` | `jdbc/LraCoordinatorDS` | JNDI name of the Liberty `<dataSource>` to use for transaction-log storage |
+| `tablePrefix` | `db` | `lra_` | Prefix for Arjuna object-store table names (e.g. `lra_JBOSSTS`) |
+
+> **`db` store prerequisites:** add `jdbc-4.3` and `jndi-1.0` to `<featureManager>`, declare a `<dataSource>` with the matching `jndiName`, and place the PostgreSQL JDBC driver JAR in `${shared.resource.dir}/jdbc/`.
 
 ### client-lra-feature
 

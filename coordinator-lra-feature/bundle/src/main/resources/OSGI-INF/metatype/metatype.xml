@@ -10,11 +10,13 @@
         <lraCoordinatorStore storeType="file"
                              storeDir="${server.output.dir}/lra-logs"/>
 
-    Usage in server.xml — database store:
+    Usage in server.xml — database store (references a Liberty <dataSource>):
+        <dataSource id="LraCoordinatorDS" jndiName="jdbc/LraCoordinatorDS">
+            ...
+        </dataSource>
+
         <lraCoordinatorStore storeType="db"
-                             dbUrl="jdbc:postgresql://db-host:5432/sagadb"
-                             dbUser="saga"
-                             dbPassword="secret"
+                             dataSourceRef="jdbc/LraCoordinatorDS"
                              tablePrefix="lra_"/>
 
     Liberty maps the element name to the OCD id "lraCoordinatorStore" and the
@@ -31,12 +33,12 @@
 
         <AD id="storeType"
             name="Store type"
-            description="Transaction-log storage backend: 'file' (default) writes logs to the local file system; 'db' writes logs to a relational database via JDBC."
+            description="Transaction-log storage backend: 'file' (default) writes logs to the local file system; 'db' uses a Liberty-managed DataSource referenced by dataSourceRef."
             type="String"
             required="false"
             default="file">
             <Option label="File store (local filesystem)" value="file"/>
-            <Option label="Database store (JDBC)"         value="db"/>
+            <Option label="Database store (Liberty DataSource)" value="db"/>
         </AD>
 
         <!-- ── File store options ──────────────────────────────────────────── -->
@@ -50,27 +52,12 @@
 
         <!-- ── Database store options ──────────────────────────────────────── -->
 
-        <AD id="dbUrl"
-            name="Database URL"
-            description="JDBC URL for the transaction-log database (storeType='db'). Example: jdbc:postgresql://db-host:5432/sagadb"
+        <AD id="dataSourceRef"
+            name="DataSource JNDI name"
+            description="JNDI name of the Liberty &lt;dataSource&gt; element to use for transaction-log storage (storeType='db'). The DataSource must be declared in the same server.xml. Example: jdbc/LraCoordinatorDS"
             type="String"
             required="false"
-            default="jdbc:postgresql://localhost:5432/sagadb"/>
-
-        <AD id="dbUser"
-            name="Database user"
-            description="JDBC username for the transaction-log database (storeType='db')."
-            type="String"
-            required="false"
-            default="saga"/>
-
-        <AD id="dbPassword"
-            name="Database password"
-            description="JDBC password for the transaction-log database (storeType='db')."
-            type="String"
-            required="false"
-            default=""
-            ibm:type="password"/>
+            default="jdbc/LraCoordinatorDS"/>
 
         <AD id="tablePrefix"
             name="Table prefix"
