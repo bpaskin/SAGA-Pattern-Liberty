@@ -11,13 +11,26 @@ If either downstream call fails the **LRA coordinator** automatically invokes ev
 
 ---
 
+## Project Variants
+
+This repository contains **two flavours** of the same three microservices:
+
+| Variant | Directories | LRA client delivery | When to use |
+|---------|-------------|---------------------|-------------|
+| **Narayana-bundled** | `deposit-service`, `withdrawal-service`, `transfer-service` | Narayana `lra-client` JAR bundled inside the WAR | Standalone Liberty, Docker Compose, or any server without the `usr:clientLRA-2.0` feature installed |
+| **Liberty-feature** | `deposit-service-noLRA-included`, `withdrawal-service-noLRA-included`, `transfer-service-noLRA-included` | Provided by the `usr:clientLRA-2.0` Liberty user feature — **nothing bundled in the WAR** | Liberty servers that have `usr:clientLRA-2.0` installed (see [Liberty User Feature — client-lra-feature](#liberty-user-feature--client-lra-feature)) |
+
+The Java source code and REST API are **identical** in both variants. The only difference is in `pom.xml` (no Narayana dependency) and `server.xml` (uses `usr:clientLRA-2.0` instead of `lra.coordinator.url` MicroProfile Config property).
+
+---
+
 ## Services
 
 | Service | Port | Context root | Role |
 |---------|------|--------------|------|
-| `deposit-service` | 9081 | `/deposit` | LRA participant — credits an account |
-| `withdrawal-service` | 9082 | `/withdrawal` | LRA participant — debits an account |
-| `transfer-service` | 9083 | `/transfer` | LRA orchestrator — starts the LRA and calls both participants |
+| `deposit-service` / `deposit-service-noLRA-included` | 9081 | `/deposit` | LRA participant — credits an account |
+| `withdrawal-service` / `withdrawal-service-noLRA-included` | 9082 | `/withdrawal` | LRA participant — debits an account |
+| `transfer-service` / `transfer-service-noLRA-included` | 9083 | `/transfer` | LRA orchestrator — starts the LRA and calls both participants |
 | Narayana LRA coordinator | 8070 | `/lra-coordinator` | Transaction coordinator (standalone process or `usr:coordinatorLRA-2.0`) |
 | PostgreSQL 16 | 5432 | — | Shared database |
 
@@ -191,6 +204,73 @@ unzip feature/target/clientLRA-2.0-feature.zip -d /path/to/wlp/usr
 ```
 
 The `path` attribute of `<lraCoordinator>` is optional and defaults to `/lra-coordinator`.
+
+---
+
+## Quick Start — Liberty Feature Variant (`*-noLRA-included`)
+
+Use these services when the Liberty `usr:clientLRA-2.0` feature is already installed. The WAR contains **no Narayana JARs** — the LRA JAX-RS filter and coordinator communication are fully handled by the Liberty feature.
+
+### Prerequisites
+
+1. Build and install the `client-lra-feature` (see [below](#liberty-user-feature--client-lra-feature)):
+   ```bash
+   cd client-lra-feature
+   mvn clean package
+   unzip feature/target/clientLRA-2.0-feature.zip -d /path/to/wlp/usr
+   ```
+
+2. Ensure each service's `server.xml` declares `usr:clientLRA-2.0` and points to the coordinator:
+
+   **`deposit-service-noLRA-included` / `withdrawal-service-noLRA-included`:**
+   ```xml
+   <featureManager>
+       <feature>restfulWS-4.0</feature>
+       <feature>jsonb-3.0</feature>
+       <feature>jsonp-2.1</feature>
+       <feature>cdi-4.1</feature>
+       <feature>mpConfig-3.1</feature>
+       <feature>jdbc-4.3</feature>
+       <feature>jndi-1.0</feature>
+       <feature>usr:clientLRA-2.0</feature>
+   </featureManager>
+
+   <lraCoordinator host="localhost" port="8070"/>
+   ```
+
+   **`transfer-service-noLRA-included`:**
+   ```xml
+   <featureManager>
+       <feature>restfulWS-4.0</feature>
+       <feature>jsonb-3.0</feature>
+       <feature>jsonp-2.1</feature>
+       <feature>cdi-4.1</feature>
+       <feature>mpConfig-3.1</feature>
+       <feature>mpRestClient-4.0</feature>
+       <feature>usr:clientLRA-2.0</feature>
+   </featureManager>
+
+   <lraCoordinator host="localhost" port="8070"/>
+   ```
+
+### Build and run
+
+```bash
+# Build all three Liberty-feature services
+cd deposit-service-noLRA-included  && mvn clean package && mvn liberty:run &
+cd withdrawal-service-noLRA-included && mvn clean package && mvn liberty:run &
+cd transfer-service-noLRA-included   && mvn clean package && mvn liberty:run &
+```
+
+### Key differences vs. Narayana-bundled variant
+
+| Aspect | Narayana-bundled (`*-service`) | Liberty-feature (`*-noLRA-included`) |
+|--------|-------------------------------|--------------------------------------|
+| LRA client JAR in WAR | ✅ `lra-client-7.x.Final.jar` bundled | ❌ Not bundled |
+| LRA coordinator URL | `lra.coordinator.url` in `microprofile-config.properties` | `<lraCoordinator host="…" port="…"/>` in `server.xml` |
+| Liberty feature required | None beyond standard features | `usr:clientLRA-2.0` must be installed |
+| WAR size | Larger (includes Narayana JARs) | Smaller (runtime provided by Liberty) |
+| Java source / REST API | Identical | Identical |
 
 ---
 
@@ -420,7 +500,7 @@ sequenceDiagram
 
 ## Configuration
 
-### deposit-service / withdrawal-service / transfer-service
+### deposit-service / withdrawal-service / transfer-service (Narayana-bundled)
 
 All three services read from `META-INF/microprofile-config.properties`. Any value can be overridden with the corresponding environment variable (uppercase, dots replaced with underscores).
 
@@ -434,6 +514,18 @@ All three services read from `META-INF/microprofile-config.properties`. Any valu
 | `db.name` | `sagadb` | deposit, withdrawal |
 | `db.user` | `saga` | deposit, withdrawal |
 | `db.password` | `saga` | deposit, withdrawal |
+
+### deposit-service-noLRA-included / withdrawal-service-noLRA-included / transfer-service-noLRA-included (Liberty-feature)
+
+The coordinator URL is **not** read from MicroProfile Config. It is configured exclusively via the `<lraCoordinator>` element in `server.xml` (provided by `usr:clientLRA-2.0`).
+
+| `server.xml` element | Attribute | Default | Description |
+|----------------------|-----------|---------|-------------|
+| `<lraCoordinator>` | `host` | `localhost` | Hostname of the LRA coordinator |
+| `<lraCoordinator>` | `port` | `8070` | HTTP port of the LRA coordinator |
+| `<lraCoordinator>` | `path` | `/lra-coordinator` | Context path of the coordinator REST API |
+
+All other properties (`withdrawal.service.url`, `deposit.service.url`, database variables) are identical to the Narayana-bundled variant and can be overridden via environment variables.
 
 ### coordinator-lra-feature
 

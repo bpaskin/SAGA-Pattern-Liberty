@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Transfer Service">
+    <featureManager>
+        <feature>restfulWS-4.0</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.1</feature>
+        <feature>mpConfig-3.1</feature>
+        <feature>mpRestClient-4.0</feature>
+    </featureManager>
+
+    <variable name="withdrawal.service.url" defaultValue="http://localhost:9082/withdrawal"/>
+    <variable name="deposit.service.url"    defaultValue="http://localhost:9081/deposit"/>
+
+    <httpEndpoint httpPort="9083" httpsPort="9446" host="*" id="defaultHttpEndpoint"/>
+
+    <webApplication location="transfer-service.war" contextRoot="/transfer"/>
+</server>
