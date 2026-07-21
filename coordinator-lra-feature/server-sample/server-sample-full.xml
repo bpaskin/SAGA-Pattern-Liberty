@@ -153,12 +153,25 @@
 
 
     <!-- ════════════════════════════════════════════════════════════════════
-         LOGGING (optional)
-         Uncomment to tune Liberty logging output.
-         The Narayana coordinator uses JUL (java.util.logging).
-         ════════════════════════════════════════════════════════════════════ -->
+         LOGGING
+         The coordinator emits structured JUL log records at the levels below.
+         Adjust traceSpecification to control verbosity.
+
+         Default (INFO only — lifecycle events and errors):
+           No <logging> element needed; INFO is Liberty's default level.
+
+         Recommended for development (adds per-request traces):
+           traceSpecification="*=info:com.ibm.saga.coordinatorlra.*=fine"
+
+         Full Narayana internals (coordinator + Arjuna transaction manager):
+           traceSpecification="*=info:com.ibm.saga.coordinatorlra.*=fine:com.arjuna.*=fine:io.narayana.*=fine"
+
+         Log levels emitted by CoordinatorLoggingFilter:
+           FINE    — every inbound request (method + URI + LRA header) and its response (status + ms)
+           WARNING — any response with HTTP status 400-599
+    ════════════════════════════════════════════════════════════════════ -->
     <!--
-    <logging traceSpecification="*=info:com.arjuna.*=fine:io.narayana.*=fine"
+    <logging traceSpecification="*=info:com.ibm.saga.coordinatorlra.*=fine"
              consoleLogLevel="INFO"
              maxFileSize="20"
              maxFiles="5"/>

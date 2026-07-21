@@ -35,6 +35,8 @@ public class LraCoordinatorApplication extends Application {
         resources.add(CoordinatorContainerFilter.class);
         // Context listener: initialises LRAService on application startup.
         resources.add(AppContextListener.class);
+        // Request/response logging filter: logs every coordinator HTTP call.
+        resources.add(CoordinatorLoggingFilter.class);
         return resources;
     }
 }
